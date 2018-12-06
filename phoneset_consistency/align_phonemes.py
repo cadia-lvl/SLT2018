@@ -180,12 +180,20 @@ def main():
     import sys
 
     args = parse_args()
+
+    # write the output otherwise written to stderr to file
+    # comment this out if you want to use the output argument for the aligned results!
+    if args.output != sys.stdout:
+        sys.stderr = args.output
+
+
     if not args.output_cols:
         output_cols = [args.align_col]
     else:
         output_cols = args.output_cols
     aligner = Aligner(phoneme_set=args.phoneme_set,
                       align_sep=args.align_sep, cleanup=args.remove_chars)
+
 
 
     print('Using the following phoneme-set: {}'.format(aligner.phoneme_set),
