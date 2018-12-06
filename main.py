@@ -18,13 +18,17 @@ FRamburðarOrðaBók (pronunciation dictionary)
 """
 
 import subprocess
-import phoneset_consistency
+import phoneset_consistency.ipa_corrector as corr
 
-############################################################
+#################################################################################
 #
 #    1. Phoneset consistency
 #
-############################################################
+#   Input: data/01_phoneset_consistency/original_IPD_WordList_IPA_SAMPA.csv
+#
+#   Final output: data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv
+#
+#################################################################################
 
 
 def cut_columns():
@@ -32,32 +36,41 @@ def cut_columns():
     # Create two dictionaries, one for each kind of transcriptions, have them tab-separated
     # Replace ':' with the IPA length-symbol 'ː' in the IPA version
 
-    cmd = "cut -d',' -f{} data/01_original_frob/original_IPD_WordList_IPA_SAMPA.csv |" \
+    cmd = "cut -d',' -f{} data/01_phoneset_consistency/original_IPD_WordList_IPA_SAMPA.csv |" \
           " sed 's/,/\t/g' {} > {}"
-    ipa_cmd = cmd.format('1,2', " | sed 's/:/ː/g' ",  'data/01_original_frob/original_IPD_IPA.csv')
-    sampa_cmd = cmd.format('1,3', '', 'data/01_original_frob/original_IPD_SAMPA.csv')
+    ipa_cmd = cmd.format('1,2', " | sed 's/:/ː/g' ",  'data/01_phoneset_consistency/original_IPD_IPA.csv')
+    sampa_cmd = cmd.format('1,3', '', 'data/01_phoneset_consistency/original_IPD_SAMPA.csv')
     subprocess.call(ipa_cmd, shell=True)
     subprocess.call(sampa_cmd, shell=True)
 
-def extract_inconsistencies():
+def extract_inconsistencies(input_file, error_file, output_file, ipa=True):
+    if ipa:
+        align_script = 'align_phonemes.py'
+    else:
+        align_script = 'align_sampa.py'
 
-    cmd = "python3 phoneset_consistency/{} {} {} --output-cols 1,2 > {}"
-    ipa_cmd = cmd.format('align_phonemes.py', 'data/01_original_frob/original_IPD_IPA.csv',
-                         'data/01_original_frob/IPD_IPA_errors.txt', 'data/01_original_frob/IPD_IPA_consistent.csv')
-    sampa_cmd = cmd.format('align_sampa.py','data/01_original_frob/original_IPD_SAMPA.csv',
-                           'data/01_original_frob/IPD_SAMPA_errors.txt', 'data/01_original_frob/IPD_SAMPA_consistent.csv')
-    subprocess.call(ipa_cmd, shell=True)
-    subprocess.call(sampa_cmd, shell=True)
+    cmd = "python3 phoneset_consistency/{} {} {} --output-cols 1,2 > {}".format(align_script, input_file, error_file, output_file)
+    subprocess.call(cmd, shell=True)
+
+
+def correct_inconsistencies(inputfile):
+
+    corr.correct_inconsistencies(inputfile)
 
 
 def phoneset_consistency_check():
+    data_dir = 'data/01_phoneset_consistency/'
     cut_columns()
-    extract_inconsistencies()
-
-
-
-# the set of IPA phoneme symbols to be used in the IPD is contained in data/00_phonesets/phone_set_IPA.txt
-
+    extract_inconsistencies(data_dir + 'original_IPD_IPA.csv',
+                            data_dir + 'IPD_IPA_errors.txt',
+                            data_dir + 'IPD_IPA_valid.csv')
+    extract_inconsistencies(data_dir + 'original_IPD_SAMPA.csv',
+                            data_dir + 'IPD_SAMPA_errors.txt',
+                            data_dir + 'IPD_SAMPA_valid.csv', ipa=False)
+    correct_inconsistencies(data_dir + 'original_IPD_IPA.csv')
+    extract_inconsistencies(data_dir + 'original_IPD_IPA_consistent.csv',
+                            data_dir + 'IPD_IPA_consistent_errors.txt',
+                            data_dir + 'IPD_IPA_consistent_aligned.csv')
 
 
 def main():
