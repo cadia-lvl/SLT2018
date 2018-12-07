@@ -20,6 +20,7 @@ FRamburðarOrðaBók (pronunciation dictionary)
 import subprocess
 import phoneset_consistency.ipa_corrector as corr
 import diphthong_consistency.diphthong_consistency as diph
+from processors.multiple_transcripts import MultipleTranscripts
 
 ################################################################################
 #
@@ -102,10 +103,59 @@ def diphthong_consistency_check():
     write_list(consistent_entries, 'data/02_diphthongs/IPD_IPA_diphthong_consistent.csv')
 
 
+#################################################################################
+#
+#    3. Transcription variants and dialects
+#
+#   Input: data/02_diphthongs/IPD_IPA_diphthong_consistent.csv  (60,693 entries)
+#
+#   Final output: data/03_multiple_transcripts/IPD_IPA_multiple_transcript_processed.csv (54,381 entries)
+#
+#################################################################################
+
+def multiple_transcripts():
+
+    out_data_dir = 'data/03_multiple_transcripts/'
+    processor = MultipleTranscripts()
+    processor.process_dictionary('data/02_diphthongs/IPD_IPA_diphthong_consistent.csv')
+
+    # Filtered dictionary, only selected multiple transcripts
+    out = open(out_data_dir + 'IPD_IPA_multiple_transcript_processed.csv', 'w')
+    out.writelines(processor.filtered_dictionary)
+
+    # Statistics on multiple entries
+    words_outfile = out_data_dir + 'words_with_multiple_transcripts.txt'
+    multiple_transcripts_outfile = out_data_dir + 'multiple_transcripts.csv'
+
+    #print("Number of words with multiple transcripts: " + str(len(processor.words_with_multiple_transcr)))
+
+    out = open(words_outfile, 'w')
+    for w in processor.words_with_multiple_transcr:
+        out.write(w + '\n')
+
+    out = open(multiple_transcripts_outfile, 'w')
+    out.writelines(processor.lines2write)
+
+    out = open(out_data_dir + 'no_choice.txt', 'w')
+    out.writelines(processor.no_choice_made)
+
+    out = open(out_data_dir + 'transcript_diff_stats.txt', 'w')
+    for diff in sorted(processor.transcript_diffs_stats, key=lambda x: len(processor.transcript_diffs_stats[x]),
+                       reverse=True):
+        out.write(str(diff) + '\t' + str(processor.transcript_diffs_stats[diff]) + '\t' + str(
+            len(processor.transcript_diffs_stats[diff])) + '\n')
+
+    out = open(out_data_dir + 'transcript_stats_only.txt', 'w')
+    for diff in sorted(processor.transcript_diffs_stats, key=lambda x: len(processor.transcript_diffs_stats[x]),
+                       reverse=True):
+        out.write(
+            str(diff) + '\t' + str(len(processor.transcript_diffs_stats[diff])) + '\n')
+
 def main():
 
     #phoneset_consistency_check()
-    diphthong_consistency_check()
+    #diphthong_consistency_check()
+    multiple_transcripts()
 
 if __name__=='__main__':
     main()
