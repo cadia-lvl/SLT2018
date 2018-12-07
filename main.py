@@ -19,14 +19,27 @@ FRamburðarOrðaBók (pronunciation dictionary)
 
 import subprocess
 import phoneset_consistency.ipa_corrector as corr
+import diphthong_consistency.diphthong_consistency as diph
+
+################################################################################
+#
+#   UTILITIY METHODS
+#
+################################################################################
+
+def write_list(list2write, filename):
+
+    with open(filename, 'w') as f:
+        for entry in list2write:
+            f.write(entry + '\n')
 
 #################################################################################
 #
 #    1. Phoneset consistency
 #
-#   Input: data/01_phoneset_consistency/original_IPD_WordList_IPA_SAMPA.csv
+#   Input: data/01_phoneset_consistency/original_IPD_WordList_IPA_SAMPA.csv (65,020 entries)
 #
-#   Final output: data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv
+#   Final output: data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv (64,861 entries)
 #
 #################################################################################
 
@@ -73,9 +86,26 @@ def phoneset_consistency_check():
                             data_dir + 'IPD_IPA_consistent_aligned.csv')
 
 
+#################################################################################
+#
+#    2. Diphthong consistency
+#
+#   Input: data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv  (64,861 entries)
+#
+#   Final output: data/02_diphthongs/IPD_IPA_diphthong_consistent.csv   (60,693 entries)
+#
+#################################################################################
+
+def diphthong_consistency_check():
+
+    consistent_entries = diph.filter_consistent_transcripts('data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv')
+    write_list(consistent_entries, 'data/02_diphthongs/IPD_IPA_diphthong_consistent.csv')
+
+
 def main():
 
-    phoneset_consistency_check()
+    #phoneset_consistency_check()
+    diphthong_consistency_check()
 
 if __name__=='__main__':
     main()
