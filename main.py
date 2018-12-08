@@ -16,10 +16,11 @@ The 'frob' token sometimes found when referring to the IPD comes from the Icelan
 FRamburðarOrðaBók (pronunciation dictionary)
 
 """
-
+import os
 import subprocess
 import phoneset_consistency.ipa_corrector as corr
 import diphthong_consistency.diphthong_consistency as diph
+import processors.post_aspiration as postaspir
 from processors.multiple_transcripts import MultipleTranscripts
 
 ################################################################################
@@ -45,15 +46,15 @@ def write_list(list2write, filename):
 #################################################################################
 
 
-def cut_columns():
+def cut_columns(inputfile, output_dir):
     # The original IPD has three comma separated columns: <word>,<IPA-transcription>,<SAMPA-transcription>
     # Create two dictionaries, one for each kind of transcriptions, have them tab-separated
     # Replace ':' with the IPA length-symbol 'ː' in the IPA version
 
-    cmd = "cut -d',' -f{} data/01_phoneset_consistency/original_IPD_WordList_IPA_SAMPA.csv |" \
+    cmd = "cut -d',' -f{} {} |" \
           " sed 's/,/\t/g' {} > {}"
-    ipa_cmd = cmd.format('1,2', " | sed 's/:/ː/g' ",  'data/01_phoneset_consistency/original_IPD_IPA.csv')
-    sampa_cmd = cmd.format('1,3', '', 'data/01_phoneset_consistency/original_IPD_SAMPA.csv')
+    ipa_cmd = cmd.format('1,2', inputfile, " | sed 's/:/ː/g' ",  output_dir + '/original_IPD_IPA.csv')
+    sampa_cmd = cmd.format('1,3', inputfile, '', output_dir + '/original_IPD_SAMPA.csv')
     subprocess.call(ipa_cmd, shell=True)
     subprocess.call(sampa_cmd, shell=True)
 
@@ -63,7 +64,8 @@ def extract_inconsistencies(input_file, error_file, output_file, ipa=True):
     else:
         align_script = 'align_sampa.py'
 
-    cmd = "python3 phoneset_consistency/{} {} {} --output-cols 1,2 > {}".format(align_script, input_file, error_file, output_file)
+    cmd = "python3 phoneset_consistency/{} {} {} --output-cols 1,2 > {}".format(
+        align_script, input_file, error_file, output_file)
     subprocess.call(cmd, shell=True)
 
 
@@ -72,19 +74,20 @@ def correct_inconsistencies(inputfile):
     corr.correct_inconsistencies(inputfile)
 
 
-def phoneset_consistency_check():
-    data_dir = 'data/01_phoneset_consistency/'
-    cut_columns()
-    extract_inconsistencies(data_dir + 'original_IPD_IPA.csv',
-                            data_dir + 'IPD_IPA_errors.txt',
-                            data_dir + 'IPD_IPA_valid.csv')
-    extract_inconsistencies(data_dir + 'original_IPD_SAMPA.csv',
-                            data_dir + 'IPD_SAMPA_errors.txt',
-                            data_dir + 'IPD_SAMPA_valid.csv', ipa=False)
-    correct_inconsistencies(data_dir + 'original_IPD_IPA.csv')
-    extract_inconsistencies(data_dir + 'original_IPD_IPA_consistent.csv',
-                            data_dir + 'IPD_IPA_consistent_errors.txt',
-                            data_dir + 'IPD_IPA_consistent_aligned.csv')
+def phoneset_consistency_check(inputfile):
+
+    data_dir, filename_ext = os.path.split(inputfile)
+    cut_columns(inputfile, data_dir)
+    extract_inconsistencies(data_dir + '/original_IPD_IPA.csv',
+                            data_dir + '/IPD_IPA_errors.txt',
+                            data_dir + '/IPD_IPA_valid.csv')
+    extract_inconsistencies(data_dir + '/original_IPD_SAMPA.csv',
+                            data_dir + '/IPD_SAMPA_errors.txt',
+                            data_dir + '/IPD_SAMPA_valid.csv', ipa=False)
+    correct_inconsistencies(data_dir + '/original_IPD_IPA.csv')
+    extract_inconsistencies(data_dir + '/original_IPD_IPA_consistent.csv',
+                            data_dir + '/IPD_IPA_consistent_errors.txt',
+                            data_dir + '/IPD_IPA_consistent_aligned.csv')
 
 
 #################################################################################
@@ -97,10 +100,10 @@ def phoneset_consistency_check():
 #
 #################################################################################
 
-def diphthong_consistency_check():
+def diphthong_consistency_check(inputfile, outputfile):
 
-    consistent_entries = diph.filter_consistent_transcripts('data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv')
-    write_list(consistent_entries, 'data/02_diphthongs/IPD_IPA_diphthong_consistent.csv')
+    consistent_entries = diph.filter_consistent_transcripts(inputfile)
+    write_list(consistent_entries, outputfile)
 
 
 #################################################################################
@@ -109,23 +112,22 @@ def diphthong_consistency_check():
 #
 #   Input: data/02_diphthongs/IPD_IPA_diphthong_consistent.csv  (60,693 entries)
 #
-#   Final output: data/03_multiple_transcripts/IPD_IPA_multiple_transcript_processed.csv (54,381 entries)
+#   Final output: data/03_multiple_transcripts/IPD_IPA_multiple_transcript_processed.csv (54,360 entries)
 #
 #################################################################################
 
-def multiple_transcripts():
+def multiple_transcripts(inputfile, out_data_dir):
 
-    out_data_dir = 'data/03_multiple_transcripts/'
     processor = MultipleTranscripts()
-    processor.process_dictionary('data/02_diphthongs/IPD_IPA_diphthong_consistent.csv')
+    processor.process_dictionary(inputfile)
 
-    # Filtered dictionary, only selected multiple transcripts
-    out = open(out_data_dir + 'IPD_IPA_multiple_transcript_processed.csv', 'w')
+    # Filtered dictionary, the final output will be created at the end of this method
+    out = open(out_data_dir + '/IPD_IPA_multiple_transcript_processed_TMP.csv', 'w')
     out.writelines(processor.filtered_dictionary)
 
     # Statistics on multiple entries
-    words_outfile = out_data_dir + 'words_with_multiple_transcripts.txt'
-    multiple_transcripts_outfile = out_data_dir + 'multiple_transcripts.csv'
+    words_outfile = out_data_dir + '/words_with_multiple_transcripts.txt'
+    multiple_transcripts_outfile = out_data_dir + '/multiple_transcripts.csv'
 
     #print("Number of words with multiple transcripts: " + str(len(processor.words_with_multiple_transcr)))
 
@@ -136,26 +138,62 @@ def multiple_transcripts():
     out = open(multiple_transcripts_outfile, 'w')
     out.writelines(processor.lines2write)
 
-    out = open(out_data_dir + 'no_choice.txt', 'w')
+    out = open(out_data_dir + '/no_choice.txt', 'w')
     out.writelines(processor.no_choice_made)
 
-    out = open(out_data_dir + 'transcript_diff_stats.txt', 'w')
+    out = open(out_data_dir + '/transcript_diff_stats.txt', 'w')
     for diff in sorted(processor.transcript_diffs_stats, key=lambda x: len(processor.transcript_diffs_stats[x]),
                        reverse=True):
         out.write(str(diff) + '\t' + str(processor.transcript_diffs_stats[diff]) + '\t' + str(
             len(processor.transcript_diffs_stats[diff])) + '\n')
 
-    out = open(out_data_dir + 'transcript_stats_only.txt', 'w')
+    out = open(out_data_dir + '/transcript_stats_only.txt', 'w')
     for diff in sorted(processor.transcript_diffs_stats, key=lambda x: len(processor.transcript_diffs_stats[x]),
                        reverse=True):
         out.write(
             str(diff) + '\t' + str(len(processor.transcript_diffs_stats[diff])) + '\n')
 
-def main():
+    # clean the last multiple transcript entries, run again
+    processor = MultipleTranscripts()
+    processor.process_dictionary(out_data_dir + '/IPD_IPA_multiple_transcript_processed_TMP.csv')
 
-    #phoneset_consistency_check()
-    #diphthong_consistency_check()
-    multiple_transcripts()
+    # Final filtered dictionary, only entries with one transcript and selected entries with multiple transcripts
+    out = open(out_data_dir + '/IPD_IPA_multiple_transcript_processed.csv', 'w')
+    out.writelines(processor.filtered_dictionary)
+
+#################################################################################
+#
+#    4. Postaspiration
+#
+#   Input: data/03_multiple_transcripts/IPD_IPA_multiple_transcript_processed.csv (54,360 entries)
+#
+#   Final output: data/04_postaspiration/IPD_IPA_postaspir_corrected.csv (54,360 entries)
+#
+#################################################################################
+
+def correct_postaspiration(inputfile, output_dir):
+    dict_list = open(inputfile).readlines()
+
+    postaspir.find_missing_postaspir(dict_list, output_dir)
+    postaspir.find_beginning_postaspir(dict_list, output_dir)
+    corrected = postaspir.ensure_postaspir(dict_list)
+    write_list(corrected, output_dir + '/IPD_IPA_postaspir_corrected.csv')
+
+def main():
+    out_data_dirs = ['data/02_diphthongs', 'data/03_multiple_transcripts', 'data/04_postaspiration',
+                     'data/05_vowel_length', 'data/06_compounds', 'data/07_alignment']
+
+    for out_dir in out_data_dirs:
+        # if exists, add a date suffix to each dir?
+        os.makedirs(out_dir, exist_ok=True)
+        #os.makedirs(out_dir)
+
+    phoneset_consistency_check('data/01_phoneset_consistency/original_IPD_WordList_IPA_SAMPA.csv')
+    diphthong_consistency_check('data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv',
+                                out_data_dirs[0] + '/IPD_IPA_diphthong_consistent.csv')
+    multiple_transcripts(out_data_dirs[0] + '/IPD_IPA_diphthong_consistent.csv',
+                         out_data_dirs[1])
+    correct_postaspiration(out_data_dirs[1] + '/IPD_IPA_multiple_transcript_processed.csv', out_data_dirs[2])
 
 if __name__=='__main__':
     main()
