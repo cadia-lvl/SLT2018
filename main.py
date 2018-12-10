@@ -18,9 +18,13 @@ FRamburðarOrðaBók (pronunciation dictionary)
 """
 import os
 import subprocess
+import sys
+import argparse
 import phoneset_consistency.ipa_corrector as corr
 import diphthong_consistency.diphthong_consistency as diph
 import processors.post_aspiration as postaspir
+import processors.length_symbol_analysis as length_sym
+import processors.compound_analysis as comp
 from processors.multiple_transcripts import MultipleTranscripts
 
 ################################################################################
@@ -179,21 +183,132 @@ def correct_postaspiration(inputfile, output_dir):
     corrected = postaspir.ensure_postaspir(dict_list)
     write_list(corrected, output_dir + '/IPD_IPA_postaspir_corrected.csv')
 
+#################################################################################
+#
+#    5. Vowel length
+#
+#   Input: data/04_postaspiration/IPD_IPA_postaspir_corrected.csv (54,360 entries)
+#
+#   Output: data/05_vowel_length/IPD_IPA_no_length_symbols (54,360 entries)
+#   NO CHANGES MADE TO THE DICTIONARY, SOLELY AN ANALYSIS STEP
+#   Keep on using the results of step 4, postaspiration, as input to step 6
+#
+#################################################################################
+
+def vowel_length_analysis(inputfile, out_dir):
+    pron_dict = open(inputfile).readlines()
+    no_len_symbols = length_sym.remove_length_symbols_from_dict(pron_dict)
+    non_initial_len_symbols = length_sym.find_length_symbol_after_1st(pron_dict)
+
+    write_list(no_len_symbols, out_dir + '/IPD_IPA_no_len_symbols.csv')
+    write_list(non_initial_len_symbols, out_dir + '/IPD_IPA_vowel_lengths_internal.csv')
+
+#################################################################################
+#
+#    6. Compound analysis
+#
+#   Input: data/04_postaspiration/IPD_IPA_postaspir_corrected.csv (54,360 entries)
+#
+#   Output 1: data/05_compound_analysis/IPD_IPA_compounds.csv
+#   Output 2: data/05_compound_analysis/IPD_IPA_multitranscr.csv
+#
+#   Final output: data/05_compound_analysis/IPD_IPA_compound_filtered.csv (40,946 entries)
+#
+#################################################################################
+
+def compound_analysis(inputfile, output_dir):
+
+    frob_in = open(inputfile).readlines()
+    pron_dict = comp.process_dictionary(frob_in)
+    compounds = comp.collect_entries(pron_dict)
+    #non_comps = comp.collect_entries(pron_dict, comp=False)
+    multi_transcr = comp.collect_multi_transcripts(pron_dict)
+
+    write_list(compounds, output_dir + '/IPD_IPA_compounds.csv')
+    write_list(multi_transcr, output_dir + '/IPD_IPA_multitranscr.csv')
+
+    # Remove compounds from dictionary:
+    list2remove = []
+    for entry in compounds:
+        word, transcr, elems = entry.split('\t')
+        list2remove.append(word + '\t' + transcr)
+
+    clean_list = remove_list(list2remove, frob_in)
+    write_list(clean_list, output_dir + '/IPD_IPA_compound_filtered.csv')
+
+def remove_list(list2remove, dict_list):
+    set2remove = set()
+    for elem in list2remove:
+        set2remove.add(elem.split('\t')[0])
+    print(str(len(set2remove)))
+    clean_list = [x.strip() for x in dict_list if x.split('\t')[0].lower() not in set2remove]
+
+    return clean_list
+
+#####################################################################################
+#
+#   MANUAL STEP: search the IPD_IPA_multitranscr.csv for errors,
+#   collect into data/05_compound_analysis/spotted_errors_comp.txt
+#
+#####################################################################################
+
+def parse_args():
+
+    parser = argparse.ArgumentParser(
+        description='Processes the raw Icelandic pronunciation dictionary to create a cleaner version',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--step', type=int, default=1,
+                        help='The first step of the process to run, then runs all subsequent steps')
+    parser.add_argument('--comp_errors', type=argparse.FileType('r'), default=sys.stdin,
+                        help='Error file, remove this content from dictionary')
+
+    return parser.parse_args()
+
 def main():
+
+    #args = parse_args()
+    #step = args.step
+    step = 6
     out_data_dirs = ['data/02_diphthongs', 'data/03_multiple_transcripts', 'data/04_postaspiration',
                      'data/05_vowel_length', 'data/06_compounds', 'data/07_alignment']
 
-    for out_dir in out_data_dirs:
+    create_dirs = out_data_dirs[step - 1:]
+
+    for out_dir in create_dirs:
         # if exists, add a date suffix to each dir?
         os.makedirs(out_dir, exist_ok=True)
         #os.makedirs(out_dir)
 
-    phoneset_consistency_check('data/01_phoneset_consistency/original_IPD_WordList_IPA_SAMPA.csv')
-    diphthong_consistency_check('data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv',
+    if step == 1:
+        phoneset_consistency_check('data/01_phoneset_consistency/original_IPD_WordList_IPA_SAMPA.csv')
+        step +=1
+
+    if step == 2:
+        diphthong_consistency_check('data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv',
                                 out_data_dirs[0] + '/IPD_IPA_diphthong_consistent.csv')
-    multiple_transcripts(out_data_dirs[0] + '/IPD_IPA_diphthong_consistent.csv',
+        step += 1
+
+    if step == 3:
+        multiple_transcripts(out_data_dirs[0] + '/IPD_IPA_diphthong_consistent.csv',
                          out_data_dirs[1])
-    correct_postaspiration(out_data_dirs[1] + '/IPD_IPA_multiple_transcript_processed.csv', out_data_dirs[2])
+        step += 1
+    if step == 4:
+        correct_postaspiration(out_data_dirs[1] + '/IPD_IPA_multiple_transcript_processed.csv', out_data_dirs[2])
+        step += 1
+
+    if step == 5:
+        vowel_length_analysis(out_data_dirs[2] + '/IPD_IPA_postaspir_corrected.csv', out_data_dirs[3])
+        step += 1
+
+    if step == 6:
+        compound_analysis(out_data_dirs[2] + '/IPD_IPA_postaspir_corrected.csv', out_data_dirs[4])
+        print("Finished compound analysis. Please control 'IPD_IPA_multitranscr.csv' for errors."
+              "Collect the errors into a text file and run main.py again from step 7")
+        sys.exit(0)
+
+    if step == 7:
+        error_file = args.comp_errors
+        remove_list(error_file.readlines(), out_data_dirs[3] + '/IPD_IPA_compound_analysis_results.csv', out_data_dirs[3])
 
 if __name__=='__main__':
     main()
