@@ -209,10 +209,10 @@ def vowel_length_analysis(inputfile, out_dir):
 #
 #   Input: data/04_postaspiration/IPD_IPA_postaspir_corrected.csv (54,360 entries)
 #
-#   Output 1: data/05_compound_analysis/IPD_IPA_compounds.csv
-#   Output 2: data/05_compound_analysis/IPD_IPA_multitranscr.csv
+#   Output 1: data/06_compound_analysis/IPD_IPA_compounds.csv
+#   Output 2: data/06_compound_analysis/IPD_IPA_multitranscr.csv
 #
-#   Final output: data/05_compound_analysis/IPD_IPA_compound_filtered.csv (40,946 entries)
+#   Final output: data/06_compound_analysis/IPD_IPA_compound_filtered.csv (40,946 entries)
 #
 #################################################################################
 
@@ -233,10 +233,10 @@ def compound_analysis(inputfile, output_dir):
         word, transcr, elems = entry.split('\t')
         list2remove.append(word + '\t' + transcr)
 
-    clean_list = remove_list(list2remove, frob_in)
+    clean_list = remove_list_by_word(list2remove, frob_in)
     write_list(clean_list, output_dir + '/IPD_IPA_compound_filtered.csv')
 
-def remove_list(list2remove, dict_list):
+def remove_list_by_word(list2remove, dict_list):
     set2remove = set()
     for elem in list2remove:
         set2remove.add(elem.split('\t')[0])
@@ -248,9 +248,41 @@ def remove_list(list2remove, dict_list):
 #####################################################################################
 #
 #   MANUAL STEP: search the IPD_IPA_multitranscr.csv for errors,
-#   collect into data/05_compound_analysis/spotted_errors_comp.txt
+#   collected into data/05_compound_analysis/spotted_errors_comp.txt
 #
 #####################################################################################
+
+#################################################################################
+#
+#    7. Remove error list from IPD
+#
+#   Input: data/06_compound_analysis/IPD_IPA_compound_filtered.csv (40,946 entries)
+#
+#   Final output: data/06_compound_analysis/IPD_IPA_compound_filtered_final.csv (40,885 entries)
+#
+#   (There are 208 entries in the 'spotted_errors' file, a lot of compounds in that file
+#    were already removed during automatic removal of compounds in the previous step)
+#
+#################################################################################
+
+def remove_list(list2remove, dict_list, out_dir):
+
+    all_lower = [x.lower() for x in list2remove]
+    set2remove = set(all_lower)
+    clean_list = [x.strip() for x in dict_list if x.strip().lower() not in set2remove]
+
+    write_list(clean_list, out_dir + '/IPD_IPA_compound_filtered_final.csv')
+
+#################################################################################
+#
+#    8. Forced alignment
+#
+#   Input: data/06_compound_analysis/IPD_IPA_compound_filtered.csv (40,946 entries)
+#
+#   Final output: data/07_alignment/IPD_IPA_aligned.csv (X entries)
+#
+#
+#################################################################################
 
 def parse_args():
 
@@ -266,9 +298,9 @@ def parse_args():
 
 def main():
 
-    #args = parse_args()
-    #step = args.step
-    step = 6
+    args = parse_args()
+    step = args.step
+    #step = 6
     out_data_dirs = ['data/02_diphthongs', 'data/03_multiple_transcripts', 'data/04_postaspiration',
                      'data/05_vowel_length', 'data/06_compounds', 'data/07_alignment']
 
@@ -308,7 +340,8 @@ def main():
 
     if step == 7:
         error_file = args.comp_errors
-        remove_list(error_file.readlines(), out_data_dirs[3] + '/IPD_IPA_compound_analysis_results.csv', out_data_dirs[3])
+        inp_dict = open(out_data_dirs[4] + '/IPD_IPA_compound_filtered.csv').readlines()
+        remove_list(error_file.read().splitlines(), inp_dict, out_data_dirs[4])
 
 if __name__=='__main__':
     main()
