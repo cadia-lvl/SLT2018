@@ -268,13 +268,13 @@ def remove_list_by_word(list2remove, dict_list):
 #
 #################################################################################
 
-def remove_list(list2remove, dict_list, out_dir):
+def remove_list(list2remove, dict_list, out_file):
 
     all_lower = [x.lower() for x in list2remove]
     set2remove = set(all_lower)
     clean_list = [x.strip() for x in dict_list if x.strip().lower() not in set2remove]
 
-    write_list(clean_list, out_dir + '/IPD_IPA_compound_filtered_final.csv')
+    write_list(clean_list, out_file)
 
 #################################################################################
 #
@@ -293,7 +293,11 @@ def align_g2p(inputfile, out_dir, symbol_map_file):
     aligned_dict, low_freq_mappings = g2p.process_dictionary(converted_dict)
 
     write_list(aligned_dict, out_dir + '/g2p_mappings.csv')
-    write_list(low_freq_mappings, out_dir + '/IPD_XSAMPA_examine_for_errors.txt')
+    write_list(low_freq_mappings, out_dir + '/IPD_XSAMPA_assumed_errors.txt')
+
+    error_list = ['\t'.join(x.split('\t')[:2]) for x in low_freq_mappings]
+    remove_list(error_list, open(converted_dict).readlines(), out_dir + '/IPD_XSAMPA_align_errors_removed.csv')
+
 
 def convert_ipa2xsampa(inputfile, out_dir, symbol_map_file):
     ipa_file = open(inputfile)
@@ -366,7 +370,7 @@ def main():
     if step == 7:
         error_file = args.comp_errors
         inp_dict = open(out_data_dirs[4] + '/IPD_IPA_compound_filtered.csv').readlines()
-        remove_list(error_file.read().splitlines(), inp_dict, out_data_dirs[4])
+        remove_list(error_file.read().splitlines(), inp_dict, out_data_dirs[4] + '/IPD_IPA_compound_filtered_final.csv')
         step += 1
 
     if step == 8:
