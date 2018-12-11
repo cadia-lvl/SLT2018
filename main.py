@@ -25,7 +25,10 @@ import diphthong_consistency.diphthong_consistency as diph
 import processors.post_aspiration as postaspir
 import processors.length_symbol_analysis as length_sym
 import processors.compound_analysis as comp
+import processors.ipa2x_sampa as ipa2sampa
+import processors.grapheme_phoneme_mapping as g2p
 from processors.multiple_transcripts import MultipleTranscripts
+
 
 ################################################################################
 #
@@ -277,12 +280,34 @@ def remove_list(list2remove, dict_list, out_dir):
 #
 #    8. Forced alignment
 #
-#   Input: data/06_compound_analysis/IPD_IPA_compound_filtered.csv (40,946 entries)
+#   Input: data/06_compound_analysis/IPD_IPA_compound_filtered_final.csv (40,885 entries)
 #
 #   Final output: data/07_alignment/IPD_IPA_aligned.csv (X entries)
 #
 #
 #################################################################################
+
+def align_g2p(inputfile, out_dir, symbol_map_file):
+    # convert inputdict to XSAMPA - g2p alignment only works with XSAMPA
+    converted_dict = convert_ipa2xsampa(inputfile, out_dir, symbol_map_file)
+    aligned_dict, low_freq_mappings = g2p.process_dictionary(converted_dict)
+
+    write_list(aligned_dict, out_dir + '/g2p_mappings.csv')
+    write_list(low_freq_mappings, out_dir + '/IPD_XSAMPA_examine_for_errors.txt')
+
+def convert_ipa2xsampa(inputfile, out_dir, symbol_map_file):
+    ipa_file = open(inputfile)
+    symbol_map = open(symbol_map_file)
+    transcription_map = ipa2sampa.create_transcription_map(symbol_map)
+
+    transcribed_dict = ipa2sampa.transcribe_dictionary(ipa_file, transcription_map)
+
+    filename = os.path.basename(inputfile)
+    out_file = out_dir + '/' + filename.replace('IPA', 'XSAMPA')
+    write_list(transcribed_dict, out_file)
+
+    return out_file
+
 
 def parse_args():
 
@@ -298,9 +323,9 @@ def parse_args():
 
 def main():
 
-    args = parse_args()
-    step = args.step
-    #step = 6
+    #args = parse_args()
+    #step = args.step
+    step = 8
     out_data_dirs = ['data/02_diphthongs', 'data/03_multiple_transcripts', 'data/04_postaspiration',
                      'data/05_vowel_length', 'data/06_compounds', 'data/07_alignment']
 
@@ -342,6 +367,11 @@ def main():
         error_file = args.comp_errors
         inp_dict = open(out_data_dirs[4] + '/IPD_IPA_compound_filtered.csv').readlines()
         remove_list(error_file.read().splitlines(), inp_dict, out_data_dirs[4])
+        step += 1
+
+    if step == 8:
+        align_g2p(out_data_dirs[4] + '/IPD_IPA_compound_filtered_final.csv', out_data_dirs[5], 'data/00_phonesets/ipa_xsampa.txt')
+
 
 if __name__=='__main__':
     main()

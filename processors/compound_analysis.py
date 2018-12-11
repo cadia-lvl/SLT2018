@@ -7,11 +7,11 @@
 
 """
 import sys
-import grapheme_phoneme_mapping
+import processors.grapheme_phoneme_mapping as g2p
 from dict_database import comp_dict_db
 from dict_database import pron_dict_db
 from pron_dict import entry
-from grapheme_phoneme_mapping import G2P_align
+from processors.grapheme_phoneme_mapping import G2P_align
 
 
 VOWELS = ['a', 'á', 'e', 'é', 'i', 'í', 'o', 'ó', 'u', 'ú', 'y', 'ý', 'ö']
@@ -40,7 +40,7 @@ class CompoundTree:
 
 def get_elem_transcriptions(elem_list, p_entry, g2p_map):
     elem_transcr_map = {}
-    aligned = grapheme_phoneme_mapping.align_g2p(p_entry.word, p_entry.transcript, g2p_map)
+    aligned = g2p.align_g2p(p_entry.word, p_entry.transcript, g2p_map)
     tuple_ind = 0
 
     for elem in elem_list:
