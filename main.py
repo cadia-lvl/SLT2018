@@ -9,8 +9,11 @@ as described in the paper:
 Nikulásdóttir, Anna B.; Jón Guðnason, and Eiríkur Rögnvaldsson (2018): An Icelandic Pronunciation Dictionary for TTS.
 In: Proceedings of SLT, Athens, Greece.
 
-The repository contains all scripts, input and expected output data. All manual steps are described at the corresponding
-places in this script.
+The repository contains all scripts, input and expected output data.
+
+After the first 6 processing steps, a manual step was performed, searching errors according to different transcripts
+of compound components. The script thus stops after step 6, and should be run from step 7 to include the error list.
+To run the script without this interuption, adjust main() accordingly.
 
 The 'frob' token sometimes found when referring to the IPD comes from the Icelandic name:
 FRamburðarOrðaBók (pronunciation dictionary)
@@ -27,6 +30,7 @@ import processors.length_symbol_analysis as length_sym
 import processors.compound_analysis as comp
 import processors.ipa2x_sampa as ipa2sampa
 import processors.grapheme_phoneme_mapping as g2p
+import processors.google_pron_comparison as comparison
 from processors.multiple_transcripts import MultipleTranscripts
 
 
@@ -41,6 +45,14 @@ def write_list(list2write, filename):
     with open(filename, 'w') as f:
         for entry in list2write:
             f.write(entry + '\n')
+
+def remove_list(list2remove, dict_list, out_file):
+
+    all_lower = [x.lower() for x in list2remove]
+    set2remove = set(all_lower)
+    clean_list = [x.strip() for x in dict_list if x.strip().lower() not in set2remove]
+
+    write_list(clean_list, out_file)
 
 #################################################################################
 #
@@ -243,7 +255,7 @@ def remove_list_by_word(list2remove, dict_list):
     set2remove = set()
     for elem in list2remove:
         set2remove.add(elem.split('\t')[0])
-    print(str(len(set2remove)))
+    #print(str(len(set2remove)))
     clean_list = [x.strip() for x in dict_list if x.split('\t')[0].lower() not in set2remove]
 
     return clean_list
@@ -268,13 +280,9 @@ def remove_list_by_word(list2remove, dict_list):
 #
 #################################################################################
 
-def remove_list(list2remove, dict_list, out_file):
+def remove_error_list(error_list, dict_list, out_file):
 
-    all_lower = [x.lower() for x in list2remove]
-    set2remove = set(all_lower)
-    clean_list = [x.strip() for x in dict_list if x.strip().lower() not in set2remove]
-
-    write_list(clean_list, out_file)
+    remove_list(error_list, dict_list, out_file)
 
 #################################################################################
 #
@@ -282,14 +290,14 @@ def remove_list(list2remove, dict_list, out_file):
 #
 #   Input: data/06_compound_analysis/IPD_IPA_compound_filtered_final.csv (40,885 entries)
 #
-#   Final output: data/07_alignment/IPD_IPA_aligned.csv (X entries)
+#   Final output: data/07_alignment/IPD_IPA_align_errors_removed.csv (40,449 entries)
 #
 #
 #################################################################################
 
-def align_g2p(inputfile, out_dir, symbol_map_file):
+def align_g2p(inputfile, out_dir):
     # convert inputdict to XSAMPA - g2p alignment only works with XSAMPA
-    converted_dict = convert_ipa2xsampa(inputfile, out_dir, symbol_map_file)
+    converted_dict = convert_transcripts(inputfile, out_dir, 'data/00_phonesets/ipa_xsampa.txt', ['IPA', 'XSAMPA'])
     aligned_dict, low_freq_mappings = g2p.process_dictionary(converted_dict)
 
     write_list(aligned_dict, out_dir + '/g2p_mappings.csv')
@@ -298,8 +306,12 @@ def align_g2p(inputfile, out_dir, symbol_map_file):
     error_list = ['\t'.join(x.split('\t')[:2]) for x in low_freq_mappings]
     remove_list(error_list, open(converted_dict).readlines(), out_dir + '/IPD_XSAMPA_align_errors_removed.csv')
 
+    # convert again to IPA
+    convert_transcripts(out_dir + '/IPD_XSAMPA_align_errors_removed.csv', out_dir,
+                                  'data/00_phonesets/xsampa_ipa.txt', ['XSAMPA', 'IPA'])
 
-def convert_ipa2xsampa(inputfile, out_dir, symbol_map_file):
+
+def convert_transcripts(inputfile, out_dir, symbol_map_file, replacement):
     ipa_file = open(inputfile)
     symbol_map = open(symbol_map_file)
     transcription_map = ipa2sampa.create_transcription_map(symbol_map)
@@ -307,12 +319,32 @@ def convert_ipa2xsampa(inputfile, out_dir, symbol_map_file):
     transcribed_dict = ipa2sampa.transcribe_dictionary(ipa_file, transcription_map)
 
     filename = os.path.basename(inputfile)
-    out_file = out_dir + '/' + filename.replace('IPA', 'XSAMPA')
+    out_file = out_dir + '/' + filename.replace(replacement[0], replacement[1])
     write_list(transcribed_dict, out_file)
 
     return out_file
 
+#################################################################################
+#
+#    9. Compare to googlei18n suggestions file
+#
+#   Input: data/07_alignment/IPD_IPA_align_errors_removed.csv (40,449 entries)
+#
+#   Final output: data/08_final_version/IPD_IPA_clean.csv (40,431 entries)
+#
+#################################################################################
 
+def compare_googlei18n_sugg(inputfile, sugg_file, out_dir):
+
+    errors_in_dict = comparison.compare_words_with_transcr(inputfile, sugg_file)
+    remove_list(errors_in_dict, open(inputfile).readlines(), out_dir + '/IPD_IPA_clean.csv')
+
+#################################################################################
+#
+#    Dictionary processing finished.
+#    To train a g2p model see g2p_experiment.py
+#
+#################################################################################
 def parse_args():
 
     parser = argparse.ArgumentParser(
@@ -327,54 +359,80 @@ def parse_args():
 
 def main():
 
-    #args = parse_args()
-    #step = args.step
-    step = 8
-    out_data_dirs = ['data/02_diphthongs', 'data/03_multiple_transcripts', 'data/04_postaspiration',
-                     'data/05_vowel_length', 'data/06_compounds', 'data/07_alignment']
+    args = parse_args()
+    step = args.step
 
-    create_dirs = out_data_dirs[step - 1:]
+    out_data_dirs = ['data/02_diphthongs', 'data/03_multiple_transcripts', 'data/04_postaspiration',
+                     'data/05_vowel_length', 'data/06_compounds', 'data/07_alignment', 'data/08_final_version']
+
+    # solve this within each step
+    if step == 1 or step == 2:
+        create_dirs = out_data_dirs
+    elif step > 4 and step < 7:
+        create_dirs = out_data_dirs[1:4]
+    elif step == 7:
+        create_dirs = out_data_dirs[5:]
+    else:
+        create_dirs = out_data_dirs[step - 3:]
 
     for out_dir in create_dirs:
         # if exists, add a date suffix to each dir?
-        os.makedirs(out_dir, exist_ok=True)
-        #os.makedirs(out_dir)
+        #os.makedirs(out_dir, exist_ok=True)
+        os.makedirs(out_dir)
 
     if step == 1:
+        print("STEP 1: phoneset consistency ...")
         phoneset_consistency_check('data/01_phoneset_consistency/original_IPD_WordList_IPA_SAMPA.csv')
         step +=1
 
     if step == 2:
+        print("STEP 2: diphthong consistency ...")
         diphthong_consistency_check('data/01_phoneset_consistency/IPD_IPA_consistent_aligned.csv',
                                 out_data_dirs[0] + '/IPD_IPA_diphthong_consistent.csv')
         step += 1
 
     if step == 3:
+        print("STEP 3: variants ...")
         multiple_transcripts(out_data_dirs[0] + '/IPD_IPA_diphthong_consistent.csv',
                          out_data_dirs[1])
         step += 1
     if step == 4:
+        print("STEP 4: postaspiration ...")
         correct_postaspiration(out_data_dirs[1] + '/IPD_IPA_multiple_transcript_processed.csv', out_data_dirs[2])
         step += 1
 
     if step == 5:
+        print("STEP 5: vowel length ...")
         vowel_length_analysis(out_data_dirs[2] + '/IPD_IPA_postaspir_corrected.csv', out_data_dirs[3])
         step += 1
 
     if step == 6:
+        print("STEP 6: compound analysis ...")
         compound_analysis(out_data_dirs[2] + '/IPD_IPA_postaspir_corrected.csv', out_data_dirs[4])
         print("Finished compound analysis. Please control 'IPD_IPA_multitranscr.csv' for errors."
-              "Collect the errors into a text file and run main.py again from step 7")
+              "\nCollect the errors into a text file and run main.py again with the arguments:\n"
+              "--step 7 --comp_errors <path_to_extracted_errors>")
         sys.exit(0)
 
     if step == 7:
+        print("STEP 7: remove errors ...")
         error_file = args.comp_errors
         inp_dict = open(out_data_dirs[4] + '/IPD_IPA_compound_filtered.csv').readlines()
         remove_list(error_file.read().splitlines(), inp_dict, out_data_dirs[4] + '/IPD_IPA_compound_filtered_final.csv')
         step += 1
 
     if step == 8:
-        align_g2p(out_data_dirs[4] + '/IPD_IPA_compound_filtered_final.csv', out_data_dirs[5], 'data/00_phonesets/ipa_xsampa.txt')
+        print("STEP 8: g2p alignment ...")
+        align_g2p(out_data_dirs[4] + '/IPD_IPA_compound_filtered_final.csv', out_data_dirs[5])
+        step += 1
+
+    if step == 9:
+        print("STEP 9: comparison googlei18n suggestions ...")
+        compare_googlei18n_sugg(out_data_dirs[5] + '/IPD_IPA_align_errors_removed.csv',
+                                'data/third_party/suggestions.csv', out_data_dirs[6])
+        print("\nFinished IPD processing. To continue with g2p model training, create training and test files"
+              " and run g2p_experiment.py\n")
+        exit(0)
 
 
 if __name__=='__main__':

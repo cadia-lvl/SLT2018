@@ -206,14 +206,14 @@ class MultipleTranscripts:
                 result.append(sub_tup)
                 last_tup_1 = tup[0]
                 last_tup_2 = tup[1]
-                if sub_tup == ('', ''):
-                    print(' '.join(arr1) + ' -- ' + ' '.join(arr2))
+                #if sub_tup == ('', ''):
+                    #print(' '.join(arr1) + ' -- ' + ' '.join(arr2))
 
         # insertion at the end of arr1?
         if len(arr1) > last_tup_1 + 1:
             ins = arr1[last_tup_1 + 1:]
             ins_tup = (' '.join(ins), '')
-            print(' '.join(arr1) + ' -- ' + ' '.join(arr2))
+            #print(' '.join(arr1) + ' -- ' + ' '.join(arr2))
             result.append(ins_tup)
 
         return result
