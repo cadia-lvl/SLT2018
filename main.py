@@ -23,8 +23,8 @@ import os
 import subprocess
 import sys
 import argparse
-import phoneset_consistency.ipa_corrector as corr
-import diphthong_consistency.diphthong_consistency as diph
+import processors.ipa_corrector as corr
+import processors.diphthong_consistency as diph
 import processors.post_aspiration as postaspir
 import processors.length_symbol_analysis as length_sym
 import processors.compound_analysis as comp
