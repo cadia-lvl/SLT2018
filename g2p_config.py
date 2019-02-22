@@ -4,15 +4,18 @@
 """
 Creates the configuration file needed by g2p_experiment.py
 
-
+Extend the file with the necessary paths for the Sequitur g2p
 
 """
 
 import configparser
 
 config = configparser.ConfigParser()
-config['pythonpath'] = {'path_export': 'export PYTHONPATH=/Users/anna/Ossian/tools/bin/../lib/python2.7/site-packages:/Users/anna/Ossian/tools/bin/../g2p ;'}
-config['g2p_tool'] = {'g2p': '/Users/anna/Ossian/tools/bin/g2p.py'}
+
+# value should be: 'export PYTHONPATH=/path/to/python/site-packages_for_sequitur:/path/to/g2p ;'
+config['pythonpath'] = {'path_export': ''}
+# value should be: 'path/to/g2p.py'
+config['g2p_tool'] = {'g2p': ''}
 
 with open('g2p.conf', 'w') as configfile:
     config.write(configfile)
