@@ -151,7 +151,7 @@ class MultipleTranscripts:
         return match_matrix
 
 
-    def _compare_transcripts(self, transcr1, transcr2):
+    def compare_transcripts(self, transcr1, transcr2):
         """
         Compare two transcripts and extract substitutions and/or insertions.
         Example:
@@ -175,7 +175,7 @@ class MultipleTranscripts:
             return self._compare_same_len(arr1, arr2)
 
         if len(arr1) < len(arr2):
-            return self._compare_transcripts(transcr2, transcr1)
+            return self.compare_transcripts(transcr2, transcr1)
 
         match_matrix = self._init_match_matrix(arr1, arr2)
 
@@ -238,13 +238,13 @@ class MultipleTranscripts:
 
         result = []
         if len(transcripts) == 2:
-            result = self._compare_transcripts(transcripts[0], transcripts[1])
+            result = self.compare_transcripts(transcripts[0], transcripts[1])
             chosen_transcript = self._choose_transcript(result, transcripts[0], transcripts[1], word)
 
         elif len(transcripts) > 2:
             reference_transcr = transcripts[0]
             for i in range(1,len(transcripts)):
-                result.extend(self._compare_transcripts(reference_transcr, transcripts[i]))
+                result.extend(self.compare_transcripts(reference_transcr, transcripts[i]))
                 chosen_transcript = self._choose_transcript(result, reference_transcr, transcripts[i], word)
 
         else:
